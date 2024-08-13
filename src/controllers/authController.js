@@ -57,18 +57,28 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+    if (!isMatch) {
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Generate OTP and send to the user's email
     const generatedOtp = randomize("0", 6);
     user.otp = generatedOtp;
     await user.save();
 
-    await sendOtpEmail(email, generatedOtp);
+    await sendOtpEmail(user.email, generatedOtp);
 
-    res.json({ success: true, message: "OTP sent to email" });
+    res.json({ token, message: "OTP sent to your email" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
